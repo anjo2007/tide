@@ -257,6 +257,16 @@ class TaskProvider extends ChangeNotifier {
     }
   }
 
+  Future<String> shareTask(TaskModel task, String ownerName) async {
+    await _dbService.shareTask(task, ownerName);
+    final baseUri = Uri.base;
+    return '${baseUri.scheme}://${baseUri.authority}/#/shared?taskId=${task.id}';
+  }
+
+  Future<Map<String, dynamic>?> getSharedTask(String taskId) async {
+    return await _dbService.getSharedTask(taskId);
+  }
+
   @override
   void dispose() {
     _tasksSubscription?.cancel();

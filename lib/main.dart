@@ -8,6 +8,7 @@ import 'package:tide/services/auth_service.dart';
 import 'package:tide/theme/app_theme.dart';
 import 'package:tide/views/auth/auth_screen.dart';
 import 'package:tide/views/dashboard/dashboard_screen.dart';
+import 'package:tide/views/task/shared_task_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -62,6 +63,26 @@ class AppRoot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
+    
+    // Check if the URL contains a task share token (taskId)
+    final uri = Uri.base;
+    String? sharedTaskId;
+
+    if (uri.queryParameters.containsKey('taskId')) {
+      sharedTaskId = uri.queryParameters['taskId'];
+    } else {
+      final fragment = uri.fragment;
+      if (fragment.contains('taskId=')) {
+        final parts = fragment.split('taskId=');
+        if (parts.length > 1) {
+          sharedTaskId = parts[1].split('&').first;
+        }
+      }
+    }
+
+    if (sharedTaskId != null && sharedTaskId.isNotEmpty) {
+      return SharedTaskScreen(taskId: sharedTaskId);
+    }
     
     if (auth.isAuthenticated) {
       return const DashboardScreen();

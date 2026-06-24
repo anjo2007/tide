@@ -127,18 +127,29 @@ class AuthService {
   // Sign Up with Email/Password
   Future<UserProfile> signUpWithEmail(String email, String password, String name) async {
     if (isFirebaseAvailable) {
-      final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      final user = credential.user!;
-      await user.updateDisplayName(name);
-      return UserProfile(
-        uid: user.uid,
-        email: user.email ?? '',
-        displayName: name,
-        photoUrl: user.photoURL,
-      );
+      try {
+        final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
+        final user = credential.user!;
+        await user.updateDisplayName(name);
+        return UserProfile(
+          uid: user.uid,
+          email: user.email ?? '',
+          displayName: name,
+          photoUrl: user.photoURL,
+        );
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'email-already-in-use') {
+          throw Exception('The email address is already in use by another account.');
+        } else if (e.code == 'weak-password') {
+          throw Exception('The password provided is too weak.');
+        } else if (e.code == 'invalid-email') {
+          throw Exception('The email address is not valid.');
+        }
+        throw Exception(e.message ?? 'An unknown registration error occurred.');
+      }
     } else {
       await Future.delayed(const Duration(milliseconds: 600));
       _mockUser = UserProfile(

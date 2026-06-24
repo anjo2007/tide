@@ -122,6 +122,60 @@ class DatabaseService {
     }
   }
 
+  // --- Share Operations ---
+  static final Map<String, Map<String, dynamic>> _mockShares = {};
+
+  Future<void> shareTask(TaskModel task, String ownerName) async {
+    if (isFirebaseAvailable) {
+      await FirebaseFirestore.instance
+          .collection('tasks')
+          .doc(task.id)
+          .collection('shares')
+          .doc('public')
+          .set({
+        'task': task.toMap(),
+        'ownerName': ownerName,
+        'sharedAt': DateTime.now().toIso8601String(),
+      });
+    } else {
+      await Future.delayed(const Duration(milliseconds: 200));
+      _mockShares[task.id] = {
+        'task': task.toMap(),
+        'ownerName': ownerName,
+        'sharedAt': DateTime.now().toIso8601String(),
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>?> getSharedTask(String taskId) async {
+    if (isFirebaseAvailable) {
+      final doc = await FirebaseFirestore.instance
+          .collection('tasks')
+          .doc(taskId)
+          .collection('shares')
+          .doc('public')
+          .get();
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data()!;
+        return {
+          'task': TaskModel.fromMap(Map<String, dynamic>.from(data['task'])),
+          'ownerName': data['ownerName'],
+        };
+      }
+      return null;
+    } else {
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (_mockShares.containsKey(taskId)) {
+        final data = _mockShares[taskId]!;
+        return {
+          'task': TaskModel.fromMap(Map<String, dynamic>.from(data['task'])),
+          'ownerName': data['ownerName'],
+        };
+      }
+      return null;
+    }
+  }
+
   void dispose() {
     _tasksController.close();
   }

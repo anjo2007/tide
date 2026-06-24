@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:tide/models/category_model.dart';
 import 'package:tide/models/task_model.dart';
+import 'package:tide/providers/auth_provider.dart';
 import 'package:tide/providers/task_provider.dart';
 import 'package:tide/theme/app_theme.dart';
 import 'package:tide/views/task/task_editor_screen.dart';
@@ -66,6 +68,66 @@ class TaskDetailScreen extends StatelessWidget {
                   ),
                 ),
               );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.share_rounded, color: AppTheme.goldAccent),
+            onPressed: () async {
+              final auth = Provider.of<AuthProvider>(context, listen: false);
+              final ownerName = auth.user?.displayName ?? 'A Tide User';
+              final shareUrl = await taskProvider.shareTask(task, ownerName);
+              
+              if (context.mounted) {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Share Task'),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Text(
+                          'Anyone with this link can view a read-only snapshot of this task:',
+                          style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF9F7F4),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFECE7DF)),
+                          ),
+                          child: SelectableText(
+                            shareUrl,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textDark,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    actions: [
+                      TextButton(
+                        child: const Text('CLOSE', style: TextStyle(color: AppTheme.textMuted)),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      TextButton(
+                        child: const Text('COPY LINK', style: TextStyle(color: AppTheme.goldAccent, fontWeight: FontWeight.bold)),
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: shareUrl));
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Link copied to clipboard!')),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              }
             },
           ),
           IconButton(
