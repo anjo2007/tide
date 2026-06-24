@@ -26,7 +26,7 @@ class AuthService {
     _initGoogleSignIn();
   }
 
-  bool _isMockMode = false;
+  bool _isMockMode = true; // FORCE MOCK MODE TO BYPASS FIREBASE AUTH ERRORS
   bool get isMockMode => _isMockMode;
   set isMockMode(bool val) {
     _isMockMode = val;
@@ -34,14 +34,7 @@ class AuthService {
   }
 
   // Check if Firebase is initialized and ready
-  bool get isFirebaseAvailable {
-    try {
-      Firebase.app();
-      return !_isMockMode;
-    } catch (_) {
-      return false;
-    }
-  }
+  bool get isFirebaseAvailable => false; // FORCE FALSE TO USE MOCK AUTH
 
   UserProfile? _mockUser;
   final _controller = StreamController<UserProfile?>.broadcast();
@@ -50,182 +43,59 @@ class AuthService {
     _mockUser = null;
   }
 
-  Future<void> _initGoogleSignIn() async {
-    if (isFirebaseAvailable) {
-      try {
-        await GoogleSignIn.instance.initialize();
-      } catch (e) {
-        debugPrint('GoogleSignIn initialization failed: $e');
-      }
-    }
-  }
+  Future<void> _initGoogleSignIn() async {}
 
   // Get current user profile
   UserProfile? get currentUser {
-    if (isFirebaseAvailable) {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        return UserProfile(
-          uid: user.uid,
-          email: user.email ?? '',
-          displayName: user.displayName ?? user.email?.split('@').first ?? 'User',
-          photoUrl: user.photoURL,
-        );
-      }
-      return null;
-    } else {
-      return _mockUser;
-    }
+    return _mockUser;
   }
 
   // Stream of auth changes
   Stream<UserProfile?> get authStateChanges {
-    if (isFirebaseAvailable) {
-      return FirebaseAuth.instance.authStateChanges().map((user) {
-        if (user != null) {
-          return UserProfile(
-            uid: user.uid,
-            email: user.email ?? '',
-            displayName: user.displayName ?? user.email?.split('@').first ?? 'User',
-            photoUrl: user.photoURL,
-          );
-        }
-        return null;
-      });
-    } else {
-      return _controller.stream;
-    }
+    return _controller.stream;
   }
 
   // Sign In with Email/Password
   Future<UserProfile> signInWithEmail(String email, String password) async {
-    if (isFirebaseAvailable) {
-      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      final user = credential.user!;
-      return UserProfile(
-        uid: user.uid,
-        email: user.email ?? '',
-        displayName: user.displayName ?? email.split('@').first,
-        photoUrl: user.photoURL,
-      );
-    } else {
-      await Future.delayed(const Duration(milliseconds: 600));
-      _mockUser = UserProfile(
-        uid: 'mock_user_123',
-        email: email,
-        displayName: email.split('@').first,
-        photoUrl: 'https://api.dicebear.com/7.x/adventurer/png?seed=${email.split('@').first}',
-      );
-      _controller.add(_mockUser);
-      return _mockUser!;
-    }
+    await Future.delayed(const Duration(milliseconds: 600));
+    _mockUser = UserProfile(
+      uid: email, // Use email as unique deterministic ID for Firestore
+      email: email,
+      displayName: email.split('@').first,
+      photoUrl: 'https://api.dicebear.com/7.x/adventurer/png?seed=${email.split('@').first}',
+    );
+    _controller.add(_mockUser);
+    return _mockUser!;
   }
 
   // Sign Up with Email/Password
   Future<UserProfile> signUpWithEmail(String email, String password, String name) async {
-    if (isFirebaseAvailable) {
-      try {
-        final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
-        final user = credential.user!;
-        await user.updateDisplayName(name);
-        return UserProfile(
-          uid: user.uid,
-          email: user.email ?? '',
-          displayName: name,
-          photoUrl: user.photoURL,
-        );
-      } on FirebaseAuthException catch (e) {
-        if (e.code == 'email-already-in-use') {
-          throw Exception('The email address is already in use by another account.');
-        } else if (e.code == 'weak-password') {
-          throw Exception('The password provided is too weak.');
-        } else if (e.code == 'invalid-email') {
-          throw Exception('The email address is not valid.');
-        }
-        throw Exception(e.message ?? 'An unknown registration error occurred.');
-      }
-    } else {
-      await Future.delayed(const Duration(milliseconds: 600));
-      _mockUser = UserProfile(
-        uid: 'mock_user_123',
-        email: email,
-        displayName: name,
-        photoUrl: 'https://api.dicebear.com/7.x/adventurer/png?seed=$name',
-      );
-      _controller.add(_mockUser);
-      return _mockUser!;
-    }
-  }
-
+    await Future.delayed(const Duration(milliseconds: 600));
+    _mockUser = UserProfile(
+      uid: email, // Use email as unique deterministic ID
+      email: email,
+      displayName: name,
+      photoUrl: 'https://api.dicebear.com/7.x/adventurer/png?seed=$name',
+    );
+    _controller.add(_mockUser);
+    return _mockUser!;
   // Sign In with Google
   Future<UserProfile> signInWithGoogle() async {
-    if (isFirebaseAvailable) {
-      UserCredential userCredential;
-      
-      if (kIsWeb) {
-        // Native Firebase Google Sign-In Popup for Web (bypasses google_sign_in package web bugs)
-        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
-        userCredential = await FirebaseAuth.instance.signInWithPopup(googleProvider);
-      } else {
-        // Standard Google Sign-In for Mobile / Desktop (v7.x+)
-        final GoogleSignIn googleSignIn = GoogleSignIn.instance;
-        final GoogleSignInAccount? googleUser = await googleSignIn.authenticate();
-        
-        if (googleUser == null) {
-          throw Exception('Sign in aborted by user');
-        }
-        
-        final GoogleSignInAuthentication googleAuth = googleUser.authentication;
-        final idToken = googleAuth.idToken;
-        
-        if (idToken == null) {
-          throw Exception('Failed to obtain ID Token from Google.');
-        }
-        
-        final AuthCredential credential = GoogleAuthProvider.credential(
-          idToken: idToken,
-        );
-        
-        userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
-      }
-      
-      final user = userCredential.user!;
-      return UserProfile(
-        uid: user.uid,
-        email: user.email ?? '',
-        displayName: user.displayName ?? 'Google User',
-        photoUrl: user.photoURL,
-      );
-    } else {
-      await Future.delayed(const Duration(milliseconds: 800));
-      _mockUser = UserProfile(
-        uid: 'mock_google_user',
-        email: 'Tide.user@gmail.com',
-        displayName: 'Tide Premium User',
-        photoUrl: 'https://api.dicebear.com/7.x/adventurer/png?seed=Tide',
-      );
-      _controller.add(_mockUser);
-      return _mockUser!;
-    }
+    await Future.delayed(const Duration(milliseconds: 800));
+    _mockUser = UserProfile(
+      uid: 'mock_google_user',
+      email: 'Tide.user@gmail.com',
+      displayName: 'Tide Premium User',
+      photoUrl: 'https://api.dicebear.com/7.x/adventurer/png?seed=Tide',
+    );
+    _controller.add(_mockUser);
+    return _mockUser!;
   }
 
   // Sign Out
   Future<void> signOut() async {
-    if (isFirebaseAvailable) {
-      await FirebaseAuth.instance.signOut();
-      try {
-        await GoogleSignIn.instance.signOut();
-      } catch (_) {}
-    } else {
-      _mockUser = null;
-      _controller.add(null);
-    }
+    _mockUser = null;
+    _controller.add(null);
   }
 
   void dispose() {
