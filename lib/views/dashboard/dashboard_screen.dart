@@ -7,6 +7,7 @@ import 'package:tide/views/dashboard/widgets/sidebar_menu.dart';
 import 'package:tide/views/dashboard/widgets/stat_summary.dart';
 import 'package:tide/views/dashboard/widgets/task_list.dart';
 import 'package:tide/views/task/task_editor_screen.dart';
+import 'package:tide/views/dashboard/widgets/ai_assistant_panel.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -17,6 +18,35 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final _searchController = TextEditingController();
+  bool _showAiAssistant = false;
+
+  void _toggleAiAssistant() {
+    final size = MediaQuery.of(context).size;
+    final isDesktop = size.width > 950;
+    if (isDesktop) {
+      setState(() {
+        _showAiAssistant = !_showAiAssistant;
+      });
+    } else {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (context) => SizedBox(
+          height: MediaQuery.of(context).size.height * 0.85,
+          child: ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            child: AIAssistantPanel(
+              onClose: () => Navigator.pop(context),
+            ),
+          ),
+        ),
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -183,23 +213,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Expanded(
             child: Scaffold(
               body: SafeArea(child: mainContent),
-              floatingActionButton: FloatingActionButton.extended(
-                onPressed: () {
-                  final auth = Provider.of<AuthProvider>(context, listen: false);
-                  if (auth.user != null) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => TaskEditorScreen(userId: auth.user!.uid),
-                      ),
-                    );
-                  }
-                },
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Add Task', style: TextStyle(fontWeight: FontWeight.bold)),
+              floatingActionButton: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  FloatingActionButton(
+                    heroTag: 'ai_chat_fab',
+                    backgroundColor: AppTheme.goldAccent,
+                    foregroundColor: Colors.white,
+                    tooltip: 'Ask Tide AI',
+                    onPressed: _toggleAiAssistant,
+                    child: Icon(
+                      isDesktop && _showAiAssistant
+                          ? Icons.close_rounded
+                          : Icons.forum_rounded,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  FloatingActionButton.extended(
+                    heroTag: 'add_task_fab',
+                    onPressed: () {
+                      final auth = Provider.of<AuthProvider>(context, listen: false);
+                      if (auth.user != null) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => TaskEditorScreen(userId: auth.user!.uid),
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('Add Task', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ],
               ),
             ),
           ),
+          if (isDesktop && _showAiAssistant)
+            AIAssistantPanel(
+              onClose: () => setState(() => _showAiAssistant = false),
+            ),
         ],
       ),
     );
