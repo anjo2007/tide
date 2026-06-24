@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tide/models/task_model.dart';
 import 'package:tide/models/category_model.dart';
+import 'package:http/http.dart' as http;
 
 class AIService {
   static final AIService _instance = AIService._internal();
@@ -200,5 +202,51 @@ I can help you analyze your tasks and plan your workflow. Try asking me:
 
 *💡 Note: Connect your Gemini API Key in the chat settings (gear icon) to unlock real-time advanced conversational intelligence.*
 """;
+  }
+
+  // Validate API key and fetch supported models from Google AI
+  Future<Map<String, dynamic>> validateApiKeyAndGetModels(String apiKey) async {
+    if (apiKey.isEmpty) {
+      return {'success': false, 'error': 'API key cannot be empty.'};
+    }
+    
+    try {
+      final url = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models?key=$apiKey');
+      final response = await http.get(url);
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List<dynamic> modelsList = data['models'] ?? [];
+        
+        // Extract model names that support generateContent method
+        final List<String> availableModels = [];
+        for (var m in modelsList) {
+          final String name = m['name'] ?? '';
+          final List<dynamic> methods = m['supportedGenerationMethods'] ?? [];
+          
+          if (methods.contains('generateContent')) {
+            // strip the "models/" prefix for clean display
+            final cleanName = name.replaceFirst('models/', '');
+            availableModels.add(cleanName);
+          }
+        }
+        
+        return {
+          'success': true,
+          'models': availableModels,
+        };
+      } else {
+        // Parse error response
+        try {
+          final errData = json.decode(response.body);
+          final errorMsg = errData['error']?['message'] ?? 'Status Code: ${response.statusCode}';
+          return {'success': false, 'error': errorMsg};
+        } catch (_) {
+          return {'success': false, 'error': 'Failed with Status Code: ${response.statusCode}'};
+        }
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Connection error: ${e.toString()}'};
+    }
   }
 }

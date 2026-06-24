@@ -35,6 +35,12 @@ class _AIAssistantPanelState extends State<AIAssistantPanel> {
   bool _hasApiKey = false;
   String _selectedModel = 'gemini-1.5-flash';
   final AIService _aiService = AIService();
+  List<String> _modelsList = [
+    'gemini-1.5-flash',
+    'gemini-1.5-pro',
+    'gemini-2.0-flash',
+    'gemini-1.0-pro',
+  ];
 
   @override
   void initState() {
@@ -59,6 +65,19 @@ class _AIAssistantPanelState extends State<AIAssistantPanel> {
       _hasApiKey = key.isNotEmpty;
       _selectedModel = model;
     });
+
+    if (key.isNotEmpty) {
+      // Quietly query available models in the background to refresh the dropdown list
+      final validation = await _aiService.validateApiKeyAndGetModels(key);
+      if (validation['success'] == true && mounted) {
+        setState(() {
+          _modelsList = List<String>.from(validation['models'] ?? []);
+          if (_modelsList.isNotEmpty && !_modelsList.contains(_selectedModel)) {
+            _selectedModel = _modelsList.first;
+          }
+        });
+      }
+    }
   }
 
   void _addInitialGreeting() {
@@ -72,15 +91,110 @@ class _AIAssistantPanelState extends State<AIAssistantPanel> {
   }
 
   Future<void> _saveApiKey() async {
-    await _aiService.saveApiKey(_apiKeyController.text.trim());
+    final apiKey = _apiKeyController.text.trim();
+    final messenger = ScaffoldMessenger.of(context);
+
+    if (apiKey.isEmpty) {
+      await _aiService.saveApiKey('');
+      setState(() {
+        _hasApiKey = false;
+        _showSettings = false;
+      });
+      messenger.showSnackBar(
+        const SnackBar(content: Text('API Key cleared. Using local Mock Mode.')),
+      );
+      return;
+    }
+
     setState(() {
-      _hasApiKey = _apiKeyController.text.trim().isNotEmpty;
-      _showSettings = false;
+      _isLoading = true;
     });
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
+
+    final validation = await _aiService.validateApiKeyAndGetModels(apiKey);
+
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = false;
+    });
+
+    if (validation['success'] == true) {
+      final List<String> fetchedModels = List<String>.from(validation['models'] ?? []);
+      await _aiService.saveApiKey(apiKey);
+      
+      // Auto-select first available or use current if supported
+      String selected = _selectedModel;
+      if (fetchedModels.isNotEmpty) {
+        if (!fetchedModels.contains(selected)) {
+          selected = fetchedModels.first;
+        }
+      }
+      await _aiService.saveModelName(selected);
+
+      setState(() {
+        _hasApiKey = true;
+        _modelsList = fetchedModels;
+        _selectedModel = selected;
+        _showSettings = false;
+      });
+
+      messenger.showSnackBar(
         SnackBar(
-          content: Text(_hasApiKey ? 'Gemini API Key saved successfully!' : 'API Key cleared. Using local Mock Mode.'),
+          content: Text('API Key validated! Connected successfully using $selected.'),
+          backgroundColor: AppTheme.successSage,
+        ),
+      );
+    } else {
+      final errorMsg = validation['error'] ?? 'Unknown API validation error';
+      
+      // Show dialog explaining the issue
+      showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('Gemini Key Error', style: TextStyle(fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Text(
+            'Google returned the following error when checking your key:\n\n'
+            '“$errorMsg”\n\n'
+            'Please check:\n'
+            '1. You generated the key from Google AI Studio.\n'
+            '2. The Generative Language API is enabled on your project.\n'
+            '3. Your internet connection is working.',
+            style: const TextStyle(fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.goldAccent,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                final dialogNavigator = Navigator.of(dialogContext);
+                // Force save anyway
+                await _aiService.saveApiKey(apiKey);
+                setState(() {
+                  _hasApiKey = true;
+                  _showSettings = false;
+                });
+                if (mounted) {
+                  dialogNavigator.pop();
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text('API Key saved anyway (validation bypassed).')),
+                  );
+                }
+              },
+              child: const Text('Save Anyway'),
+            ),
+          ],
         ),
       );
     }
@@ -267,12 +381,20 @@ class _AIAssistantPanelState extends State<AIAssistantPanel> {
                                   });
                                 }
                               },
-                              items: const [
-                                DropdownMenuItem(value: 'gemini-1.5-flash', child: Text('Gemini 1.5 Flash (Recommended)')),
-                                DropdownMenuItem(value: 'gemini-1.5-pro', child: Text('Gemini 1.5 Pro')),
-                                DropdownMenuItem(value: 'gemini-2.0-flash', child: Text('Gemini 2.0 Flash')),
-                                DropdownMenuItem(value: 'gemini-1.0-pro', child: Text('Gemini 1.0 Pro')),
-                              ],
+                              items: _modelsList.map((String model) {
+                                String displayName = model;
+                                if (model == 'gemini-1.5-flash') {
+                                  displayName = 'Gemini 1.5 Flash (Recommended)';
+                                } else if (model == 'gemini-1.5-pro') {
+                                  displayName = 'Gemini 1.5 Pro';
+                                } else if (model == 'gemini-2.0-flash') {
+                                  displayName = 'Gemini 2.0 Flash';
+                                }
+                                return DropdownMenuItem<String>(
+                                  value: model,
+                                  child: Text(displayName),
+                                );
+                              }).toList(),
                             ),
                           ),
                         ),
