@@ -166,25 +166,35 @@ class AuthService {
   // Sign In with Google
   Future<UserProfile> signInWithGoogle() async {
     if (isFirebaseAvailable) {
-      final GoogleSignIn googleSignIn = GoogleSignIn.instance;
-      final GoogleSignInAccount? googleUser = await googleSignIn.authenticate();
+      UserCredential userCredential;
       
-      if (googleUser == null) {
-        throw Exception('Sign in aborted by user');
+      if (kIsWeb) {
+        // Native Firebase Google Sign-In Popup for Web (bypasses google_sign_in package web bugs)
+        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+        userCredential = await FirebaseAuth.instance.signInWithPopup(googleProvider);
+      } else {
+        // Standard Google Sign-In for Mobile / Desktop (v7.x+)
+        final GoogleSignIn googleSignIn = GoogleSignIn.instance;
+        final GoogleSignInAccount? googleUser = await googleSignIn.authenticate();
+        
+        if (googleUser == null) {
+          throw Exception('Sign in aborted by user');
+        }
+        
+        final GoogleSignInAuthentication googleAuth = googleUser.authentication;
+        final idToken = googleAuth.idToken;
+        
+        if (idToken == null) {
+          throw Exception('Failed to obtain ID Token from Google.');
+        }
+        
+        final AuthCredential credential = GoogleAuthProvider.credential(
+          idToken: idToken,
+        );
+        
+        userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
       }
       
-      final GoogleSignInAuthentication googleAuth = googleUser.authentication;
-      final idToken = googleAuth.idToken;
-      
-      if (idToken == null) {
-        throw Exception('Failed to obtain ID Token from Google.');
-      }
-      
-      final AuthCredential credential = GoogleAuthProvider.credential(
-        idToken: idToken,
-      );
-      
-      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
       final user = userCredential.user!;
       return UserProfile(
         uid: user.uid,
