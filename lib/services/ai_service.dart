@@ -10,6 +10,7 @@ class AIService {
   AIService._internal();
 
   static const String _apiKeyPrefsKey = 'gemini_api_key';
+  static const String _modelPrefsKey = 'gemini_model_name';
 
   // Get saved API key
   Future<String> getApiKey() async {
@@ -23,12 +24,25 @@ class AIService {
     await prefs.setString(_apiKeyPrefsKey, apiKey.trim());
   }
 
+  // Get saved Model Name
+  Future<String> getModelName() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_modelPrefsKey) ?? 'gemini-1.5-flash';
+  }
+
+  // Save Model Name
+  Future<void> saveModelName(String modelName) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_modelPrefsKey, modelName.trim());
+  }
+
   // Send message to Gemini with task list context
   Future<String> getAIResponse({
     required String userMessage,
     required List<TaskModel> tasks,
   }) async {
     final apiKey = await getApiKey();
+    final modelName = await getModelName();
 
     if (apiKey.isEmpty) {
       // No API key - Run offline mock intelligence
@@ -65,7 +79,7 @@ Instructions:
 
       // 2. Initialize Gemini Model
       final model = GenerativeModel(
-        model: 'gemini-1.5-flash',
+        model: modelName,
         apiKey: apiKey,
         systemInstruction: Content.system(systemInstruction),
       );

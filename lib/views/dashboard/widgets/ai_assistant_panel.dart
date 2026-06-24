@@ -33,6 +33,7 @@ class _AIAssistantPanelState extends State<AIAssistantPanel> {
   bool _isLoading = false;
   bool _showSettings = false;
   bool _hasApiKey = false;
+  String _selectedModel = 'gemini-1.5-flash';
   final AIService _aiService = AIService();
 
   @override
@@ -52,9 +53,11 @@ class _AIAssistantPanelState extends State<AIAssistantPanel> {
 
   Future<void> _loadSettings() async {
     final key = await _aiService.getApiKey();
+    final model = await _aiService.getModelName();
     setState(() {
       _apiKeyController.text = key;
       _hasApiKey = key.isNotEmpty;
+      _selectedModel = model;
     });
   }
 
@@ -233,6 +236,48 @@ class _AIAssistantPanelState extends State<AIAssistantPanel> {
                         onPressed: _saveApiKey,
                       ),
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Text(
+                        'Model:',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textDark),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFECE7DF)),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: _selectedModel,
+                              isExpanded: true,
+                              style: const TextStyle(fontSize: 12, color: AppTheme.textDark, fontWeight: FontWeight.w500),
+                              icon: const Icon(Icons.arrow_drop_down, color: AppTheme.goldAccent),
+                              onChanged: (String? val) async {
+                                if (val != null) {
+                                  await _aiService.saveModelName(val);
+                                  setState(() {
+                                    _selectedModel = val;
+                                  });
+                                }
+                              },
+                              items: const [
+                                DropdownMenuItem(value: 'gemini-1.5-flash', child: Text('Gemini 1.5 Flash (Recommended)')),
+                                DropdownMenuItem(value: 'gemini-1.5-pro', child: Text('Gemini 1.5 Pro')),
+                                DropdownMenuItem(value: 'gemini-2.0-flash', child: Text('Gemini 2.0 Flash')),
+                                DropdownMenuItem(value: 'gemini-1.0-pro', child: Text('Gemini 1.0 Pro')),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
