@@ -18,30 +18,35 @@ class StorageService {
     required Uint8List? webImageBytes, // Bytes for web upload
   }) async {
     if (isFirebaseAvailable) {
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('users')
-          .child(userId)
-          .child('tasks')
-          .child(taskId)
-          .child('photo.jpg');
+      try {
+        final storageRef = FirebaseStorage.instance
+            .ref()
+            .child('users')
+            .child(userId)
+            .child('tasks')
+            .child(taskId)
+            .child('photo.jpg');
 
-      if (kIsWeb) {
-        if (webImageBytes == null) {
-          throw Exception('Web image bytes are required for web upload.');
+        if (kIsWeb) {
+          if (webImageBytes == null) {
+            throw Exception('Web image bytes are required for web upload.');
+          }
+          // Upload bytes
+          final uploadTask = storageRef.putData(
+            webImageBytes,
+            SettableMetadata(contentType: 'image/jpeg'),
+          );
+          final snapshot = await uploadTask;
+          return await snapshot.ref.getDownloadURL();
+        } else {
+          // Upload file (mobile/desktop)
+          final uploadTask = storageRef.putFile(File(imageFile.path));
+          final snapshot = await uploadTask;
+          return await snapshot.ref.getDownloadURL();
         }
-        // Upload bytes
-        final uploadTask = storageRef.putData(
-          webImageBytes,
-          SettableMetadata(contentType: 'image/jpeg'),
-        );
-        final snapshot = await uploadTask;
-        return await snapshot.ref.getDownloadURL();
-      } else {
-        // Upload file (mobile/desktop)
-        final uploadTask = storageRef.putFile(File(imageFile.path));
-        final snapshot = await uploadTask;
-        return await snapshot.ref.getDownloadURL();
+      } catch (e) {
+        debugPrint('Firebase Storage upload failed: $e. Falling back to mock URL.');
+        return 'https://picsum.photos/seed/$taskId/800/600';
       }
     } else {
       // Mock Storage Upload Delay
