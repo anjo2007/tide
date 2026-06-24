@@ -26,14 +26,14 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'PLACEHOLDER-API-KEY-WEB',
-    appId: '1:1234567890:web:1234567890abcdef',
-    messagingSenderId: '1234567890',
-    projectId: 'Tide-placeholder',
-    authDomain: 'Tide-placeholder.firebaseapp.com',
-    storageBucket: 'Tide-placeholder.appspot.com',
+    apiKey: 'AIzaSyCGtnegX_0lB_ac_i22E7p9a6SXdROKrK4',
+    appId: '1:1012475868227:web:01708c87e4c99cde7310f6',
+    messagingSenderId: '1012475868227',
+    projectId: 'tide-385d5',
+    authDomain: 'tide-385d5.firebaseapp.com',
+    storageBucket: 'tide-385d5.firebasestorage.app',
+    measurementId: 'G-P2BW80DZ5W',
   );
-
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'PLACEHOLDER-API-KEY-ANDROID',
     appId: '1:1234567890:android:1234567890abcdef',
