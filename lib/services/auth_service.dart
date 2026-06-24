@@ -79,6 +79,8 @@ class AuthService {
     );
     _controller.add(_mockUser);
     return _mockUser!;
+  }
+
   // Sign In with Google
   Future<UserProfile> signInWithGoogle() async {
     await Future.delayed(const Duration(milliseconds: 800));
