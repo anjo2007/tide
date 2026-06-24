@@ -51,18 +51,17 @@ class AIService {
       return _getMockResponse(userMessage, tasks);
     }
 
-    try {
-      // 1. Construct system instruction context containing the user's tasks
-      final now = DateTime.now();
-      final tasksContext = tasks.map((t) {
-        final category = CategoryModel.defaultCategories.firstWhere(
-          (c) => c.id == t.categoryId,
-          orElse: () => CategoryModel(id: 'other', name: 'Other', iconName: 'bookmark', colorValue: 0xFF7A868A),
-        );
-        return '- ID: ${t.id}, Title: "${t.title}", Desc: "${t.description}", Board: ${category.name}, Priority: ${t.priority}, Due: ${t.dueDate.toIso8601String()}, Done: ${t.isCompleted}';
-      }).join('\n');
+    // 1. Construct system instruction context containing the user's tasks
+    final now = DateTime.now();
+    final tasksContext = tasks.map((t) {
+      final category = CategoryModel.defaultCategories.firstWhere(
+        (c) => c.id == t.categoryId,
+        orElse: () => CategoryModel(id: 'other', name: 'Other', iconName: 'bookmark', colorValue: 0xFF7A868A),
+      );
+      return '- ID: ${t.id}, Title: "${t.title}", Desc: "${t.description}", Board: ${category.name}, Priority: ${t.priority}, Due: ${t.dueDate.toIso8601String()}, Done: ${t.isCompleted}';
+    }).join('\n');
 
-      final systemInstruction = '''
+    final systemInstruction = '''
 You are Tide AI, an advanced, premium, and friendly productivity assistant built into the Tide Task Manager.
 You have direct, real-time access to the user's task database to answer their questions.
 
@@ -79,22 +78,44 @@ Instructions:
 5. If they ask to "suggest tasks", suggest 3 smart, highly relevant tasks based on the categories they currently work on (e.g. Work, Personal, Shopping).
 ''';
 
-      // 2. Initialize Gemini Model
-      final model = GenerativeModel(
-        model: modelName,
-        apiKey: apiKey,
-        systemInstruction: Content.system(systemInstruction),
-      );
+    // 2. Initialize Gemini Model
+    final model = GenerativeModel(
+      model: modelName,
+      apiKey: apiKey,
+      systemInstruction: Content.system(systemInstruction),
+    );
 
-      // 3. Generate content
-      final content = [Content.text(userMessage)];
-      final response = await model.generateContent(content);
-      
-      return response.text ?? 'I received an empty response from Gemini. Please try again.';
-    } catch (e) {
-      debugPrint('Gemini API Error: $e');
-      return 'Error connecting to Gemini: ${e.toString()}\n\n*Tip: Double-check your API key in the chat settings gear.*';
+    // 3. Generate content with automatic retries for transient server errors (503, 429)
+    int maxRetries = 3;
+    int delaySeconds = 1;
+
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        final content = [Content.text(userMessage)];
+        final response = await model.generateContent(content);
+        return response.text ?? 'I received an empty response from Gemini. Please try again.';
+      } catch (e) {
+        final errStr = e.toString();
+        final isTransientError = errStr.contains('503') || errStr.contains('429') || errStr.contains('UNAVAILABLE');
+
+        if (isTransientError && attempt < maxRetries) {
+          debugPrint('Gemini transient error (attempt $attempt/$maxRetries): $e. Retrying in $delaySeconds seconds...');
+          await Future.delayed(Duration(seconds: delaySeconds));
+          delaySeconds *= 2; // exponential backoff
+          continue;
+        }
+
+        debugPrint('Gemini API Error (attempt $attempt/$maxRetries): $e');
+        if (attempt == maxRetries) {
+          if (errStr.contains('503') || errStr.contains('UNAVAILABLE')) {
+            return '⚠️ **Tide AI is temporarily overloaded:** The Gemini model is currently experiencing extremely high demand.\n\n'
+                   '*Tip: Try opening the chat settings gear ⚙️ and choosing a different model (such as Gemini 1.5 Pro or Gemini 2.0 Flash) to use another server cluster.*';
+          }
+          return 'Error connecting to Gemini: $errStr\n\n*Tip: Double-check your API key in the chat settings gear.*';
+        }
+      }
     }
+    return 'Failed to obtain response from Gemini after multiple attempts. Please try again later.';
   }
 
   // High-fidelity local Dart-based parser for Offline Mock Mode
