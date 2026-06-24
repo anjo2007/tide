@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1012475868227",
+    "project_id": "tide-385d5",
+    "storage_bucket": "tide-385d5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1012475868227:android:b0cce0bc276353027310f6",
+        "android_client_info": {
+          "package_name": "com.tideup.tide_up"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAFzDdooy7ciVk8WEYUSSOVbGxAMazqytc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
